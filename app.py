@@ -1,21 +1,17 @@
-from flask import Flask, request, render_template, redirect
+from flask import Flask, request, render_template
 from huggingface_hub import InferenceClient
 import docx
 import os
+from dotenv import load_dotenv
+
+# === Cargar variables de entorno ===
+load_dotenv()
+HF_TOKEN = os.getenv("HF_TOKEN")  # Asegúrate de tener HF_TOKEN en .env o en Render Environment Variables
 
 # === Configuración del cliente de Hugging Face ===
 client = InferenceClient(
     model="openai/gpt-oss-120b",
-    token="REMOVED"
-)
-from flask import Flask, request, render_template
-from huggingface_hub import InferenceClient
-import docx
-
-# === Configuración del modelo ===
-client = InferenceClient(
-    model="openai/gpt-oss-120b",
-    token="REMOVED"
+    token=HF_TOKEN
 )
 
 # === Función para leer .docx ===
@@ -33,7 +29,6 @@ RUTA_EJEMPLO = os.path.join(BASE_DIR, "docs", "tareaejemplo.docx")
 
 rubricText = leer_docx(RUTA_RUBRICA)
 ejemploTexto = leer_docx(RUTA_EJEMPLO)
-
 
 # === Ejemplo de calificación predefinida ===
 EJEMPLO_CALIFICACION = """
@@ -67,15 +62,6 @@ def index():
                     "- Ofrece una retroalimentación positiva destacando lo mejor del trabajo."
                     "- Señala áreas de oportunidad en un tono constructivo, sugiriendo cómo mejorar."
                     "- Usa un lenguaje claro y motivador para estudiantes de preparatoria."
-                    "Ejemplo de salida esperada:"
-                    "1. Punto numero uno: 2/2 - Retroalimentacion respecto a este punto"
-                    "2, Punto numero dos: 1.5/2 - Retroalimentacion respecto a este punto"
-                    "3, Punto numero tres: 1/2 - Retroalimentacion respecto a este punto"
-                    "4, Punto numero cuatro: .5/2 - Retroalimentacion respecto a este punto"
-                    "5, Punto numero cinco: 1/2 - Retroalimentacion respecto a este punto"
-                    " Calificación total: 6/10"
-                    "Retroalimentación positiva: Colocar aqui la retroalimentacion positiva"
-                    "Áreas de oportunidad: Colocar aqui las areas de oportunidad"
                 )
             },
             {
@@ -104,6 +90,3 @@ Texto del alumno: {nueva_tarea}
 
 if __name__ == "__main__":
     app.run(debug=True)
-
-
-
