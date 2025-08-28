@@ -1,18 +1,15 @@
 from flask import Flask, request, render_template, redirect, url_for
-from huggingface_hub import InferenceClient
+from groq import Groq
 import docx
 import os
 from dotenv import load_dotenv
 
 # === Cargar variables de entorno ===
 load_dotenv()
-HF_TOKEN = os.getenv("HF_TOKEN")  # Token de Hugging Face
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")  # Necesitas configurarlo en tu .env o en Render
 
-# === Configuración del cliente de Hugging Face ===
-client = InferenceClient(
-    model="openai/gpt-oss-120b",
-    token=HF_TOKEN
-)
+# === Configuración del cliente de Groq ===
+client = Groq(api_key=GROQ_API_KEY)
 
 # === Inicializar Flask ===
 app = Flask(__name__)
@@ -20,7 +17,7 @@ app = Flask(__name__)
 # === Carpeta donde se guardará la configuración ===
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DOCS_DIR = os.path.join(BASE_DIR, "docs")
-os.makedirs(DOCS_DIR, exist_ok=True)  # Crear carpeta si no existe
+os.makedirs(DOCS_DIR, exist_ok=True)
 
 # === Función para leer .docx ===
 def leer_docx(ruta_archivo):
@@ -30,31 +27,30 @@ def leer_docx(ruta_archivo):
         texto += parrafo.text + "\n"
     return texto.strip()
 
-# === Función para leer prompt de archivo de texto ===
+# === Función para leer prompt desde archivo ===
 def leer_prompt():
     prompt_path = os.path.join(DOCS_DIR, "prompt.txt")
     if os.path.exists(prompt_path):
         with open(prompt_path, "r", encoding="utf-8") as f:
             return f.read()
-    return ""  # Si no existe, devuelve vacío
+    return ""
 
-# === Ruta de configuración para subir archivos ===
+# === Ruta de configuración ===
 @app.route("/config", methods=["GET", "POST"])
 def config():
     if request.method == "POST":
-        # Guardar rúbrica
         if "rubrica" in request.files:
             rubrica_file = request.files["rubrica"]
             rubrica_file.save(os.path.join(DOCS_DIR, "rubrica.docx"))
-        # Guardar tarea ejemplo
+
         if "tarea_ejemplo" in request.files:
             ejemplo_file = request.files["tarea_ejemplo"]
             ejemplo_file.save(os.path.join(DOCS_DIR, "tareaejemplo.docx"))
-        # Guardar evaluación ejemplo
+
         if "eval_ejemplo" in request.files:
             eval_file = request.files["eval_ejemplo"]
             eval_file.save(os.path.join(DOCS_DIR, "evaluacionejemplo.docx"))
-        # Guardar prompt
+
         prompt_text = request.form.get("prompt")
         if prompt_text:
             with open(os.path.join(DOCS_DIR, "prompt.txt"), "w", encoding="utf-8") as f:
@@ -64,10 +60,9 @@ def config():
 
     return render_template("config.html")
 
-# === Ruta principal para evaluar tareas ===
+# === Ruta principal ===
 @app.route("/", methods=["GET", "POST"])
 def index():
-    # Cargar configuración actual
     rubric_path = os.path.join(DOCS_DIR, "rubrica.docx")
     ejemplo_path = os.path.join(DOCS_DIR, "tareaejemplo.docx")
     eval_path = os.path.join(DOCS_DIR, "evaluacionejemplo.docx")
@@ -84,7 +79,7 @@ def index():
         tarea_file = request.files["tarea"]
         nueva_tarea = leer_docx(tarea_file)
 
-        # Construir prompt final
+        # === Construir prompt final ===
         messages = [
             {"role": "system", "content": prompt_text},
             {"role": "user", "content": f"""
@@ -100,9 +95,14 @@ Texto del alumno: {nueva_tarea}
 """}
         ]
 
-        response = client.chat_completion(messages=messages, max_tokens=500)
-        evaluacion = response.choices[0].message["content"]
+        # === Llamada al modelo en Groq ===
+        response = client.chat.completions.create(
+            model="oss-120b",   # ⚡ Aquí sigues usando OSS 120B
+            messages=messages,
+            max_tokens=500
+        )
 
+        evaluacion = response.choices[0].message.content
         return render_template("resultado.html", evaluacion=evaluacion)
 
     return render_template("index.html")
